@@ -1,0 +1,240 @@
+#!/usr/local/bin/php -d display_errors=STDOUT
+<?php
+    date_default_timezone_set('America/Los_Angeles');
+    $hours_to_show = 12;
+    
+    function get_hour_string($timestamp)
+    {
+        $hour = date("g", $timestamp);
+        $amPm = date("A", $timestamp);
+        return $hour.":00".$amPm;
+    }
+    
+    function get_events($person, $timestamp)
+    {
+        
+        $database = "calendar.db";
+        
+        try
+        {
+            $db = new SQLite3($database);
+        }
+        catch (Exception $exception)
+        {
+            echo '<p>There was an error connecting to the database!</p>';
+            
+            if ($db)
+            {
+                echo $exception->getMessage();
+            }
+            
+        }
+        
+        $hour = date("G",$timestamp);
+        $month = date("m",$timestamp);
+        $day = date("d",$timestamp);
+        $year = date("Y",$timestamp);
+        
+        $timeStampMin = mktime($hour,0,0,$month,$day,$year);
+        $timeStampMax = $timeStampMin + 3600;
+        
+        $table = "adv_calendar_info";
+        $field1 = "person";
+        $field2 = "start_time";
+        $field3 = "event_title";
+        $field4 = "event_message";
+        $field5 = "task";
+        $field6 = "repeat";
+        
+        $events_array = array();
+        $tasks_array = array();
+        $sql = "SELECT $field3,$field4,$field5 FROM $table WHERE $field2 >= '$timeStampMin' AND $field2 < '$timeStampMax' AND $field1 == '$person'";
+        $result = $db->query($sql);
+        
+        while($record=$result->fetchArray()) {
+            $events_array[$record[$field3]] = $record[$field4];
+            
+            array_push($tasks_array, $record[$field5]);
+        }
+        
+        $info_array = array($events_array,$tasks_array);
+        
+        return $info_array;
+    }
+    
+    
+    $currentTime = $_GET["currenttime"];
+    
+    $date = date("D", $currentTime).", ".date("F", $currentTime)." ".date("d", $currentTime).", ".date("Y", $currentTime)." ".date("g",$currentTime).":".date("i", $currentTime)." ".date("A", $currentTime);
+    
+    
+    
+    $justopen = $_GET["justopen"];
+    $persontab = $_GET["displaying"];
+    $deletion = $_GET["eventdeletion"];
+    
+    if ($justopen == "no") {
+        
+        $database = "calendar.db";
+        
+        try
+        {
+            $db = new SQLite3($database);
+        }
+        catch (Exception $exception)
+        {
+            echo '<p>There was an error connecting to the database!</p>';
+            
+            if ($db)
+            {
+                echo $exception->getMessage();
+            }
+            
+        }
+        
+        date_default_timezone_set('America/Los_Angeles');
+        
+        $table = "adv_calendar_info";
+        $field1 = "person";
+        $field2 = "start_time";
+        $field3 = "event_title";
+        $field4 = "event_message";
+        $field5 = "task";
+        $field6 = "repeat";
+        
+        if ($deletion  == "yes") {
+            $title = $_GET["deletiontitle"];
+            $sql = "DELETE FROM $table WHERE $field3 = '$title' AND $field1 = '$persontab'";
+            $result = $db->query($sql);
+        }
+        
+        else {
+            
+            $helen = $_GET["helen"];
+            $sylvia = $_GET["sylvia"];
+            $winona = $_GET["winona"];
+            
+            
+            
+            $my_array = array();
+            if ($helen == "yes"){
+                array_push($my_array,"helen");
+            }
+            if ($sylvia == "yes"){
+                array_push($my_array,"sylvia");
+            }
+            if ($winona == "yes"){
+                array_push($my_array,"winona");
+            }
+            
+            $startdate = $_GET["startdate"];
+            $starttime = $_GET["starttime"];
+            $event_title = $_GET["eventtitle"];
+            $event_message = $_GET["eventmessage"];
+            $task = $_GET["task"];
+            $repeat = (int)$_GET["repetition"];
+            
+            
+            
+            $starttimeArray = explode(":",$starttime);
+            $startdateArray = explode("/",$startdate);
+            
+            
+            
+            
+            $starttimeStamp = mktime($starttimeArray[0],$starttimeArray[1],0,$startdateArray[0],$startdateArray[1],$startdateArray[2]);
+            
+            
+            
+            
+            for ($i = 0; $i < count($my_array); $i++) {
+                $person = $my_array[$i];
+                
+                for ($j = 0; $j <10; $j++ ) {
+                    $newstarttimeStamp = (int)$starttimeStamp + ($j*24*3600*$repeat);
+                    
+                    $sql = "INSERT INTO $table ($field1, $field2, $field3, $field4, $field5, $field6) VALUES ('$person', '$newstarttimeStamp', '$event_title','$event_message' , '$task', '$repeat')";
+                    $result = $db->query($sql);
+                }
+            }
+        }
+    }
+    
+    
+    if ($persontab == "helen") {
+        $showperson = "Helen";
+    }
+    else if ($persontab == "sylvia") {
+        $showperson = "Sylvia";
+    }
+    else {
+        $showperson = "Winona";
+    }
+    
+    echo "<h1 id='headings'>Schedule for {$showperson}: {$date} </h1>";
+    echo "<table id='event_table'>";
+    echo "<tr> <th class='hr_td_'>&nbsp;&nbsp;&nbsp;</th> <th class='table_header'></th> </tr>";
+    
+    $time = $currentTime;
+    
+    for ($hours = 0; $hours <= $hours_to_show; $hours++)
+    {
+        $displayHour = get_hour_string($time);
+        $infos = get_events($persontab, $time);
+        
+        $events = $infos[0];
+        $tasks = $infos[1];
+        
+        $index = 0;
+        
+        if ($hours % 2 == 0)
+        {
+            echo "<tr class='even_row'> <td class='hr_td'>{$displayHour}</td> <td class='_td' ondblclick = 'openForm(this)'>";
+            foreach($events as $title => $message)
+            {
+                echo"<div class='eventoutput' onclick = 'forceClose()'> <div class='eventoutput-content'>";
+                
+                if ($tasks[$index] == "yes"){
+                    echo"<input  class = 'taskid' type='checkbox'  name='task' value = 'completed'/>";
+                }
+                echo"<div class='eventoutput-header'> <span class ='closeevent' onclick = 'deleted(this)'>&times;</span> <p >{$title}</p> </div> <div class='eventoutput-body'> <p>{$message}</p> </div> </div> </div>";
+                
+                $index = $index+1;
+                
+            }
+            echo "</td></tr>";
+        }
+        
+        else
+        {
+            echo "<tr class='odd_row'> <td class='hr_td'>{$displayHour}</td> <td class='_td'  ondblclick = 'openForm(this)'>";
+            foreach($events as $title => $message)
+            {
+                echo"<div class='eventoutput' onclick = 'forceClose()'> <div class='eventoutput-content'>";
+                
+                if ($tasks[$index] == "yes"){
+                    echo"<input  class = 'taskid' type='checkbox'  name='task' value = 'completed'/>";
+                }
+                echo"<div class='eventoutput-header'> <span class ='closeevent' onclick = 'deleted(this)'>&times;</span> <p>{$title}</p> </div> <div class='eventoutput-body'> <p>{$message}</p> </div> </div> </div>";
+                
+                $index = $index+1;
+                
+            }
+            echo "</td></tr>";
+        }
+        $time += 3600;
+    }
+    
+    $newCurrentTime = time();
+    $prevTime = $currentTime - (60*60*12);
+    $nextTime = $currentTime + (60*60*12);
+    
+    echo "</table>";
+    
+    echo "<div> <form id='prev' method='get' action='AdvancedCalendar.php'> <p> <input type='hidden' name='time_stamp' value='{$prevTime}' /> <input type='submit' name = 'pageSelection' value='Previous twelve hours'/> </p> </form>";
+    
+    echo "<form id='next' method='get' action='AdvancedCalendar.php'> <p>  <input type='hidden' name='time_stamp' value='{$nextTime}' />  <input type='submit' name = 'pageSelection' value='Next twelve hours'/> </p> </form>";
+    
+    echo "<form id='today' method='get' action='AdvancedCalendar.php'> <p> <input type='submit' name = 'pageSelection' value='Today'/> </p> </form> </div>";
+    ?>
+
